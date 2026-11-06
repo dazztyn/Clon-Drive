@@ -1,0 +1,17 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      # La usa el navegador, por eso apunta a localhost y no al nombre del servicio
+      VITE_API_URL: http://localhost:3001
+    depends_on:
+      - backend
