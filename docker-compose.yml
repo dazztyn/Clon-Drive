@@ -52,6 +52,8 @@ services:
     environment:
       <<: *backend-env
       PORT: 3001
+      # shortcut: secreto fijo de desarrollo, en un despliegue real iría en un .env o un gestor de secretos
+      JWT_SECRET: clon-drive-dev-secret-cambiar-en-produccion
     ports:
       - "3001:3001"
     depends_on: *backend-deps
