@@ -1,10 +1,66 @@
+x-backend-env: &backend-env
+  DATABASE_URL: postgres://clondrive:clondrive@postgres:5432/clondrive
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  AWS_ENDPOINT: http://localstack:4566
+  S3_BUCKET: clon-drive
+  SQS_QUEUE_URL: http://localstack:4566/000000000000/uploads
+
+x-backend-deps: &backend-deps
+  postgres:
+    condition: service_healthy
+  localstack:
+    condition: service_healthy
+
 services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: clondrive
+      POSTGRES_PASSWORD: clondrive
+      POSTGRES_DB: clondrive
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "clondrive", "-d", "clondrive"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # No cambiar a latest: las versiones nuevas piden LOCALSTACK_AUTH_TOKEN
+  localstack:
+    image: localstack/localstack:4.12
+    environment:
+      SERVICES: s3,sqs
+    ports:
+      - "4566:4566"
+    volumes:
+      - ./infra/localstack/init.sh:/etc/localstack/init/ready.d/init.sh:ro
+    healthcheck:
+      # Sano solo cuando init.sh ya creó el bucket y la cola
+      test: ["CMD-SHELL", "curl -sf localhost:4566/_localstack/init/ready | grep -q '\"completed\": *true'"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   backend:
     build: ./backend
     environment:
+      <<: *backend-env
       PORT: 3001
     ports:
       - "3001:3001"
+    depends_on: *backend-deps
+
+  worker:
+    build: ./backend
+    command: ["node", "src/worker.js"]
+    environment: *backend-env
+    depends_on: *backend-deps
 
   frontend:
     build: ./frontend
@@ -14,3 +70,6 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+
+volumes:
+  pgdata:

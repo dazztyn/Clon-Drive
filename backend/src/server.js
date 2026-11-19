@@ -1,12 +1,25 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { HeadBucketCommand } from '@aws-sdk/client-s3';
+import { GetQueueAttributesCommand } from '@aws-sdk/client-sqs';
+import { pool } from './db.js';
+import { s3, sqs, BUCKET, QUEUE_URL } from './aws.js';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get('/health', (req, res) => res.json({ ok: true }));
+app.get('/health', async (req, res) => {
+  const checks = await Promise.allSettled([
+    pool.query('SELECT 1'),
+    s3.send(new HeadBucketCommand({ Bucket: BUCKET })),
+    sqs.send(new GetQueueAttributesCommand({ QueueUrl: QUEUE_URL, AttributeNames: ['QueueArn'] })),
+  ]);
+  const [db, bucket, queue] = checks.map((c) => (c.status === 'fulfilled' ? 'ok' : 'error'));
+  const ok = checks.every((c) => c.status === 'fulfilled');
+  res.status(ok ? 200 : 503).json({ ok, db, bucket, queue });
+});
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`API en http://localhost:${PORT}`));
