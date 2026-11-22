@@ -45,7 +45,7 @@ Worker <── SQS ── lee el temporal ──> S3 (LocalStack) ──> marca 
 ```
 
 ### Flujo de carga
-1. El front hace `POST /files` (multipart, con `folderId`) usando axios, con progreso y `AbortController`.
+1. El front hace `POST /files?folderId=<id>` (multipart) usando axios, con progreso y `AbortController`.
 2. La API guarda el temporal, inserta `files` con `status='pending'`, envía `{fileId}` a SQS y responde `202`.
 3. El worker recibe el mensaje y vuelve a leer el estado en la BD. Si es `cancelled`, borra el temporal y descarta el mensaje. Si no, lo marca `uploading`, lo sube a S3 como `users/<ownerId>/<fileId>`, lo marca `ready` y borra el temporal.
 4. Cancelar tiene dos casos:
@@ -83,7 +83,7 @@ shares  (id, resource_type: file|folder, resource_id, user_id -> users,
 | GET | `/folders/root/contents`, `/folders/:id/contents` | Carpetas y archivos de un nivel |
 | POST | `/folders` | `{name, parentId}` |
 | PATCH / DELETE | `/folders/:id` | Renombrar / eliminar (requiere edit) |
-| POST | `/files` | Multipart. Responde 202 con `{id, status}` |
+| POST | `/files?folderId=` | Multipart (campo `file`). Responde 202 con `{id, status}` |
 | GET | `/files/:id` | Estado y metadatos (el front consulta hasta que quede `ready`) |
 | POST | `/files/:id/cancel` | Cancela si está `pending` |
 | GET | `/files/:id/download` | Stream desde S3 con `Content-Disposition` en RFC 5987 |
@@ -100,7 +100,7 @@ Todas las rutas salvo `/health` y `/auth/*` requieren `Authorization: Bearer <to
 - [x] **1. Infra**: LocalStack 4.12 (S3 + SQS) y Postgres 17 en compose, con `healthcheck`. [infra/localstack/init.sh](infra/localstack/init.sh) crea el bucket `clon-drive` y la cola `uploads`. [db/init.sql](db/init.sql) tiene el esquema completo. El servicio `worker` ([backend/src/worker.js](backend/src/worker.js)) ya lee la cola, pero por ahora solo registra los mensajes y los borra. Los clientes están en [backend/src/db.js](backend/src/db.js) y [backend/src/aws.js](backend/src/aws.js). `GET /health` revisa la BD, el bucket y la cola, y responde 503 si alguno falla. Backend y worker esperan a que Postgres y LocalStack estén `healthy`.
 - [x] **2. Auth**: [backend/src/auth.js](backend/src/auth.js) tiene `POST /auth/register` (201, o 409 si el usuario existe), `POST /auth/login` (401 si las credenciales fallan) y `GET /auth/me`, y exporta el middleware `requireAuth`, que deja `req.user = {id, username}`. El usuario tiene entre 3 y 30 caracteres `[a-zA-Z0-9_.-]` y la contraseña entre 6 y 72 (el límite de bcrypt). El JWT dura 7 días. `server.js` tiene un 404 JSON y un manejador de errores que siempre responde `{error}`. En el front, [frontend/src/api.js](frontend/src/api.js) es la instancia de axios que agrega el token guardado en `localStorage`, y [frontend/src/AuthForm.jsx](frontend/src/AuthForm.jsx) es el login y registro. Ya se eliminó la plantilla de Vite.
 - [x] **3. Carpetas**: [backend/src/folders.js](backend/src/folders.js) tiene `GET /folders/root/contents`, `GET /folders/:id/contents` y `POST /folders`. El contenido viene como `{folder, path, folders, files}`: `path` es la ruta desde la raíz (sale de una CTE recursiva) y `files` excluye los `cancelled`. Un id inválido o inexistente da 404 y una carpeta ajena da 403. `getOwnFolder` es el único punto que revisa el acceso: hoy solo deja pasar al dueño, y en la fase 6 se le suman los shares. Se permiten nombres repetidos, como en Drive. En el front, [frontend/src/Drive.jsx](frontend/src/Drive.jsx) lista, crea y navega con breadcrumb. La carpeta actual vive en el estado de React, no en la URL, así que el botón "atrás" del navegador no navega entre carpetas.
-- [ ] **4. Carga con cola**: `POST /files`, SQS, worker, estados y cancelación. En el front: drag & drop nativo, progreso y botón cancelar.
+- [x] **4. Carga con cola**: [backend/src/files.js](backend/src/files.js) tiene `POST /files?folderId=` (multipart, campo `file`), `GET /files/:id` y `POST /files/:id/cancel`. La carpeta destino va en la query para validarla antes de recibir el archivo. El mensaje a SQS es `{fileId, tmpName}`. multer escribe en el volumen `uploads` (`UPLOAD_DIR=/uploads`), compartido entre API y worker, con un límite de `MAX_FILE_SIZE` (1 GB; si se pasa, responde 413). El nombre llega en latin1 desde busboy y se convierte a UTF-8. Si el cliente aborta a mitad de la transferencia, multer borra el parcial y el manejador de errores no responde (`req.readableAborted`). [backend/src/worker.js](backend/src/worker.js) pasa el estado a `uploading` con un UPDATE atómico (solo desde `pending`/`uploading`, así que un cancelado nunca se sube), sube a S3 por stream con `ContentLength`, marca `ready` + `s3_key` o `failed`, y borra el temporal. Si la BD falla, no borra el mensaje y SQS lo reintenta. `VisibilityTimeout` es de 300 s. En el front, [frontend/src/useUploads.js](frontend/src/useUploads.js) maneja cada subida (axios con `onUploadProgress` y `AbortController`, y luego consulta `GET /files/:id` cada segundo), y [frontend/src/Drive.jsx](frontend/src/Drive.jsx) tiene el drag & drop nativo, el botón "Subir archivos", el panel de subidas con progreso y el botón "Cancelar" (en `sending` aborta el HTTP y en `pending` llama a `/cancel`; en `uploading` ya no se puede).
 - [ ] **5. Descarga**, renombrar y eliminar.
 - [ ] **6. Permisos y compartir**: tabla `shares`, resolución por ancestros y vista "Compartido conmigo".
 - [ ] **7. Pulido y demo**: errores 404/403/413 bien mapeados, prueba completa con 2 o 3 usuarios, y la presentación.
@@ -135,6 +135,8 @@ Servicios: API en 3001, frontend en 5173, LocalStack en 4566 y Postgres en 5432 
 - `SQS_QUEUE_URL` usa el host `localstack:4566` (en Docker) o `localhost:4566` (fuera de Docker). La URL que devuelve LocalStack por defecto (`sqs.us-east-1.localhost.localstack.cloud`) no resuelve desde otro contenedor.
 - `JWT_SECRET` está fijo en `docker-compose.yml` porque es un secreto de desarrollo. Sin esa variable, la API no arranca.
 - Si una petición devuelve 401 a mitad de sesión (por ejemplo, porque el token expiró), el front todavía no cierra la sesión solo. Solo valida el token al cargar la página. Hay que resolverlo en la fase 7.
+- Si el worker muere con un mensaje recibido (por ejemplo con `docker compose stop worker` durante el long poll), ese mensaje queda invisible 300 s antes de reprocesarse. No se pierden datos, pero el archivo tarda en pasar a `ready` (o en limpiarse, si estaba cancelado). Durante la demo no hay que reiniciar el worker.
+- El `curl.exe` de Windows manda los nombres de archivo en la página de códigos de la consola y no en UTF-8, así que las tildes salen mal si pruebas con curl. Con el navegador funcionan bien.
 - Con LocalStack caído, `/health` tarda unos 12 s en responder 503 porque el SDK reintenta.
 - `init.sh` tiene que tener saltos de línea LF. Lo asegura `.gitattributes`, pero si alguien lo edita en Windows hay que revisarlo.
 - En Docker Desktop para Windows, los bind mounts no propagan cambios para hot reload. Por eso hoy los contenedores se reconstruyen con `--build`.

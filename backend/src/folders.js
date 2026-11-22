@@ -5,11 +5,11 @@ import { requireAuth } from './auth.js';
 export const foldersRouter = Router();
 foldersRouter.use(requireAuth);
 
-const parseId = (value) => (/^\d+$/.test(String(value)) ? Number(value) : null);
+export const parseId = (value) => (/^\d+$/.test(String(value)) ? Number(value) : null);
 
 // Responde 404/403 y devuelve null si la carpeta no existe o no es del usuario.
 // shortcut: solo el dueño tiene acceso; en la fase 6 se suman los shares por carpeta ancestra.
-async function getOwnFolder(rawId, user, res) {
+export async function getOwnFolder(rawId, user, res) {
   const id = parseId(rawId);
   const { rows } = id
     ? await pool.query('SELECT id, name, parent_id, owner_id FROM folders WHERE id = $1', [id])

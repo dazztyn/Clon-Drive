@@ -7,6 +7,7 @@ import { pool } from './db.js';
 import { s3, sqs, BUCKET, QUEUE_URL } from './aws.js';
 import { authRouter } from './auth.js';
 import { foldersRouter } from './folders.js';
+import { filesRouter } from './files.js';
 
 const app = express();
 app.use(cors());
@@ -25,12 +26,16 @@ app.get('/health', async (req, res) => {
 
 app.use('/auth', authRouter);
 app.use('/folders', foldersRouter);
+app.use('/files', filesRouter);
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 
 // Express 5 manda aquí también los errores de las rutas async
 app.use((err, req, res, next) => {
-  const status = err.status || 500;
+  // El cliente canceló la subida a mitad: multer ya borró el parcial y no hay a quién responder
+  if (req.readableAborted) return;
+  if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'El archivo supera el tamaño máximo permitido' });
+  const status = err.name === 'MulterError' ? 400 : err.status || 500;
   if (status >= 500) console.error(err);
   res.status(status).json({ error: status >= 500 ? 'Error interno del servidor' : err.message });
 });

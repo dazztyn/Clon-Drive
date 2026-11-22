@@ -6,6 +6,8 @@ x-backend-env: &backend-env
   AWS_ENDPOINT: http://localstack:4566
   S3_BUCKET: clon-drive
   SQS_QUEUE_URL: http://localstack:4566/000000000000/uploads
+  UPLOAD_DIR: /uploads
+  MAX_FILE_SIZE: 1073741824 # 1 GB
 
 x-backend-deps: &backend-deps
   postgres:
@@ -56,12 +58,16 @@ services:
       JWT_SECRET: clon-drive-dev-secret-cambiar-en-produccion
     ports:
       - "3001:3001"
+    volumes:
+      - uploads:/uploads
     depends_on: *backend-deps
 
   worker:
     build: ./backend
     command: ["node", "src/worker.js"]
     environment: *backend-env
+    volumes:
+      - uploads:/uploads
     depends_on: *backend-deps
 
   frontend:
@@ -75,3 +81,4 @@ services:
 
 volumes:
   pgdata:
+  uploads: # temporales de subida, compartido entre API y worker

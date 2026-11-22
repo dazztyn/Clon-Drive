@@ -55,7 +55,8 @@ button {
   color: var(--text);
   cursor: pointer;
 }
-button[type='submit'] {
+button[type='submit'],
+button.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-text);
@@ -129,4 +130,30 @@ button.link {
   text-align: left;
 }
 .item .muted { margin-left: auto; font-size: 0.9rem; }
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 60vh;
+  padding: 8px;
+  margin: -8px;
+  border: 2px dashed transparent;
+  border-radius: 10px;
+}
+.dropzone.dragging { border-color: var(--accent); background: var(--surface); }
+.hint { margin: -8px 0 0; font-size: 0.9rem; }
+
+.uploads {
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.uploads .row { justify-content: space-between; }
+.uploads ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.uploads li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.uploads .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uploads progress { width: 160px; }
+.uploads button { padding: 4px 10px; font-size: 0.9rem; }
 button.item:hover { background: var(--bg); }
