@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, getToken, setToken } from './api.js';
 import AuthForm from './AuthForm.jsx';
+import Drive from './Drive.jsx';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -41,8 +42,7 @@ export default function App() {
         </div>
       </header>
       <main className="content">
-        <h2>Mi unidad</h2>
-        <p className="muted">Aquí van las carpetas y archivos (fase 3).</p>
+        <Drive />
       </main>
     </div>
   );

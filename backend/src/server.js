@@ -6,6 +6,7 @@ import { GetQueueAttributesCommand } from '@aws-sdk/client-sqs';
 import { pool } from './db.js';
 import { s3, sqs, BUCKET, QUEUE_URL } from './aws.js';
 import { authRouter } from './auth.js';
+import { foldersRouter } from './folders.js';
 
 const app = express();
 app.use(cors());
@@ -23,6 +24,7 @@ app.get('/health', async (req, res) => {
 });
 
 app.use('/auth', authRouter);
+app.use('/folders', foldersRouter);
 
 app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 
