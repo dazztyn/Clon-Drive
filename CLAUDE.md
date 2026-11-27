@@ -22,6 +22,26 @@ Técnicos:
 
 Presentación (Canva/PPT): arquitectura de software, arquitectura de sistema (uso de cada servicio), visuales, alcance (qué hace y qué no), división de tareas, metodología. **No se permite Scrum**: usamos Kanban.
 
+## Rúbrica (39 pts: 13 criterios de 0 a 3)
+
+| Criterio | Dónde se cubre | Estado |
+|---|---|---|
+| Arrastrar y soltar el documento para subirlo a un bucket | Fase 4 (en la demo, mostrar el bucket con `awslocal s3 ls`) | ✅ |
+| Asignar accesos (lectura o editor) a un archivo cargado | Fase 6 (requiere la 5 para que se note la diferencia entre roles) | ⏳ |
+| Crear directorios | Fase 3 | ✅ |
+| Cancelar una carga a mitad de subida | Fase 4 (en la demo, usar un archivo grande) | ✅ |
+| Compartir archivos o directorios completos de forma interna | Fase 6 (share por carpeta con herencia a sus descendientes) | ⏳ |
+| Subir al menos 3 tipos de archivo (.png, .jpeg, .jpg, .raw, .webp, audio, .docx, .pptx, .pdf) | Fase 4 (se acepta cualquier tipo) | ✅ |
+| Contenerizado con Docker o Podman | Fases 0 y 1 | ✅ |
+| Multiusuario | Fase 2 | ✅ |
+| La presentación tiene todas las diapositivas del enunciado | Presentación | ⏳ |
+| Arquitectura de software coherente y justificada | Presentación (API, worker, flujo de carga, modelo de datos) | ⏳ |
+| Arquitectura de infraestructura coherente y justificada | Presentación (S3, SQS, Postgres, volumen compartido; por qué una cola) | ⏳ |
+| Explicación técnica de por qué se usa la metodología (Kanban) | Presentación (con el tablero real como evidencia) | ⏳ |
+| División de tareas clara entre los integrantes | Presentación (tiene que coincidir con el tablero y los commits) | ⏳ |
+
+La descarga (requisito 6 del enunciado) no tiene puntaje en la rúbrica, pero el enunciado la exige y sin ella no se puede demostrar el permiso de lectura.
+
 ## Stack
 
 | Pieza | Elección |
